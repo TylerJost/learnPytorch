@@ -1,9 +1,17 @@
+# +
 import os
 import cv2
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import time
 # %matplotlib inline
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+
 REBUILD_DATA=False
 
 # +
@@ -58,17 +66,10 @@ if REBUILD_DATA:
 # -
 
 training_data = np.load('training_data.npy', allow_pickle=True)
-plt.imshow(training_data[1][0], cmap='gray')
-plt.show()
+# plt.imshow(training_data[1][0], cmap='gray')
+# plt.show()
 
 # # Build the Model
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-training_data[1][0].shape
-
 
 # +
 class Net(nn.Module):
@@ -91,11 +92,7 @@ class Net(nn.Module):
         x = F.max_pool2d(F.relu(self.conv2(x)), (2,2))
         x = F.max_pool2d(F.relu(self.conv3(x)), (2,2))
         if self._to_linear is None:
-            self._to_linear = x[0].shape[0]*x[0].shape[1]*x[0].shape[2]
-        
-#         print(self._to_linear)
-#         print(x.flatten().shape[0])
-        
+            self._to_linear = x[0].shape[0]*x[0].shape[1]*x[0].shape[2] 
         return x
     def forward(self, x):
         x = self.convs(x)
@@ -107,10 +104,6 @@ class Net(nn.Module):
 net = Net()
 
 # +
-import torch.optim as optim
-optimizer = optim.Adam(net.parameters(), lr=0.001)
-loss_function = nn.MSELoss()
-
 X = torch.Tensor([i[0] for i in training_data]).view(-1, 50, 50)
 X = X/255.0 # Scales values
 y = torch.Tensor([i[1] for i in training_data])
@@ -125,64 +118,63 @@ train_y = y[:-val_size]
 
 test_X = X[val_size:]
 test_y = y[val_size:]
-
-# +
-BATCH_SIZE = 100
-EPOCHS = 1
-
-
-def train(net):
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
-    loss_function = nn.MSELoss()
-    for epoch in range(EPOCHS):
-        for i in tqdm(range(0, len(train_X), BATCH_SIZE)): # from 0, to the len of x, stepping BATCH_SIZE at a time. [:50] ..for now just to dev
-            #print(f"{i}:{i+BATCH_SIZE}")
-            # Generally not all the data can fit on the GPU
-            # So we send data to the 
-            
-            batch_X = train_X[i:i+BATCH_SIZE].view(-1, 1, 50, 50).to(device)
-            batch_y = train_y[i:i+BATCH_SIZE].to(device)
-            
-            net.zero_grad()
-
-            outputs = net(batch_X)
-            loss = loss_function(outputs, batch_y)
-            loss.backward()
-            optimizer.step()    # Does the update
-
-        print(f"Epoch: {epoch}. Loss: {loss}")
-
-
-def test(net):
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for i in tqdm(range(len(test_X))):
-            real_class = torch.argmax(test_y[i]).to(device)
-            net_out = net(test_X[i].view(-1, 1, 50, 50).to(device))[0]  # returns a list, 
-            predicted_class = torch.argmax(net_out)
-
-            if predicted_class == real_class:
-                correct += 1
-            total += 1
-    print(f'Accuracy: {correct/total*100:0.2f}')
-
-
-
-# +
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-    print("running on GPU")
-
-# Pytorch will not automatically convert everything for use on the GPU
-# Keep in mind tensors on the GPU will only be able to react with 
-net = Net().to(device)
 # -
 
-EPOCHS = 20
+net = net.to(device)
+optimizer = optim.Adam(net.parameters(), lr=0.001)
+loss_function = nn.MSELoss()
+
+# +
+MODEL_NAME = f"model-{int(time.time())}"
+
+def fwd_pass(X, y, train=False):
+    """
+    Generic function for:
+    taking in data and training, 
+    running through the network, 
+    then calculating metrics
+    """
+    if train:
+        net.zero_grad()
+    outputs = net(X)
+    matches  = [torch.argmax(i)==torch.argmax(j) for i, j in zip(outputs, y)]
+    acc = matches.count(True)/len(matches)
+    loss = loss_function(outputs, y)
+
+    if train:
+        loss.backward()
+        optimizer.step()
+
+    return acc, loss
+
+def test(size=32):
+    X, y = test_X[:size], test_y[:size]
+    val_acc, val_loss = fwd_pass(X.view(-1, 1, 50, 50).to(device), y.to(device))
+    return val_acc, val_loss
+
+def train(net):
+    BATCH_SIZE = 100
+    EPOCHS = 3
+
+    with open(f"./logs/{MODEL_NAME}.log", "a") as f:
+        for epoch in range(EPOCHS):
+            for i in tqdm(range(0, len(train_X), BATCH_SIZE)): # from 0, to the len of x, stepping BATCH_SIZE at a time. [:50] ..for now just to dev
+                #print(f"{i}:{i+BATCH_SIZE}")
+                # Generally not all the data can fit on the GPU
+                # So we send data to a batch
+
+                batch_X = train_X[i:i+BATCH_SIZE].view(-1, 1, 50, 50).to(device)
+                batch_y = train_y[i:i+BATCH_SIZE].to(device)
+
+                net.zero_grad()
+
+                # Send through network
+                acc, loss = fwd_pass(batch_X, batch_y, train=True)
+                if i % 10 == 0:
+                    val_acc, val_loss = test(size=100)
+                    f.write(f"{MODEL_NAME},{time.time():0.4f},{acc:0.4f},{loss:0.4f},{val_acc:0.4f},{val_loss:0.4f}\n")
+            print(f"Epoch: {epoch} \n Loss: {loss:0.2f} In-sample acc: {acc:0.2f}")
 train(net)
-test(net)
-
-
+# -
 
 # ! squeue -u tjost
