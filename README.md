@@ -12,6 +12,6 @@ __Thoughts__: This tutorial series is quite basic, but fails to explain much of 
 ### Sentdex
 __Origin__: https://www.youtube.com/watch?v=BzcBsTou0C0&list=PLQVvvaa0QuDdeMyHEYc0gxFpYwHY2Qfdh
 
-__Status__: In progress
+__Status__: Completed
 
-__Thoughts__: To come
+__Thoughts__: Overall a helpful introduction to using pytorch to build a neural network and convolutional neural network. In particular the use of a custom dataset and working through building that helped me navigate some of the issues that arose. 
