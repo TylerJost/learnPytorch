@@ -1,4 +1,4 @@
-# +
+##
 import os
 import cv2
 import numpy as np
@@ -14,7 +14,7 @@ import torch.optim as optim
 
 REBUILD_DATA=False
 
-# +
+##
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
     print("running on GPU")
@@ -63,7 +63,7 @@ class DogsVSCats():
 if REBUILD_DATA:
     dogsvcats = DogsVSCats()
     dogsvcats.make_training_data()
-# -
+##
 
 training_data = np.load('training_data.npy', allow_pickle=True)
 # plt.imshow(training_data[1][0], cmap='gray')
@@ -71,7 +71,7 @@ training_data = np.load('training_data.npy', allow_pickle=True)
 
 # # Build the Model
 
-# +
+##
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
@@ -103,7 +103,7 @@ class Net(nn.Module):
 
 net = Net()
 
-# +
+##
 X = torch.Tensor([i[0] for i in training_data]).view(-1, 50, 50)
 X = X/255.0 # Scales values
 y = torch.Tensor([i[1] for i in training_data])
@@ -112,19 +112,19 @@ VAL_PCT = 0.1
 val_size = int(len(X)*VAL_PCT)
 print(val_size)
 
-# +
+##
 train_X = X[:-val_size]
 train_y = y[:-val_size]
 
 test_X = X[val_size:]
 test_y = y[val_size:]
-# -
+##
 
 net = net.to(device)
 optimizer = optim.Adam(net.parameters(), lr=0.001)
 loss_function = nn.MSELoss()
 
-# +
+##
 MODEL_NAME = f"model-{int(time.time())}"
 
 def fwd_pass(X, y, train=False):
@@ -175,6 +175,6 @@ def train(net):
                     f.write(f"{MODEL_NAME},{time.time():0.4f},{acc:0.4f},{loss:0.4f},{val_acc:0.4f},{val_loss:0.4f}\n")
             print(f"Epoch: {epoch} \n Loss: {loss:0.2f} In-sample acc: {acc:0.2f}")
 train(net)
-# -
+##
 
 # ! squeue -u tjost

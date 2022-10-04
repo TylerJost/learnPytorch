@@ -14,4 +14,11 @@ __Origin__: https://www.youtube.com/watch?v=BzcBsTou0C0&list=PLQVvvaa0QuDdeMyHEY
 
 __Status__: Completed
 
-__Thoughts__: Overall a helpful introduction to using pytorch to build a neural network and convolutional neural network. In particular the use of a custom dataset and working through building that helped me navigate some of the issues that arose. 
+__Thoughts__: Overall a helpful introduction to using pytorch to build a neural network and convolutional neural network. In particular the use of a custom dataset and working through building that helped me navigate some of the issues that arose.
+
+### pytorchOfficial
+__Origin__: Pytorch official documentation
+
+__Status__: In progress
+
+__Thoughts__: To come 
