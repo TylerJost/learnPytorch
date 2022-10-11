@@ -75,7 +75,7 @@ class NeuralNet2(nn.Module):
         self.linear2 = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
-        out = self.linear(x)
+        out = self.linear1(x)
         out = self.relu(out)
         out = self.linear2(out)
         # no softmax at end
@@ -94,7 +94,7 @@ class NeuralNet2(nn.Module):
         self.linear2 = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
-        out = self.linear(x)
+        out = self.linear1(x)
         out = self.relu(out)
         out = self.linear2(out)
         # no softmax at end
