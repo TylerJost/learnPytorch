@@ -151,15 +151,15 @@ conv1 = nn.Conv2d(in_channels = 3, out_channels = 6, kernel_size = 5)
 pool = nn.MaxPool2d(2, 2)
 conv2 = nn.Conv2d(6, 16, 5)
 
-print(images.shape)
+print(f'Initial shape: {images.shape}')
 x = conv1(images)
-print(x.shape)
+print(f'After Conv1: {x.shape}')
 x = pool(x)
-print(x.shape)
+print(f'After pooling: {x.shape}')
 x = conv2(x)
-print(x.shape)
+print(f'After Conv2: {x.shape}')
 x = pool(x)
-print(x.shape)
+print(f'After pooling: {x.shape}')
 # Now we know why the input to the first fully connected layer is 16*5*5
 
 # %% [markdown]
@@ -177,3 +177,12 @@ print(x.shape)
 #
 # S = Stride
 #
+# %%
+outputSizeCNN = lambda W, F, P, S: (W-F+2*P)/S + 1
+outputSizePool = lambda W, F, S : (W-F)/S + 1
+W = 32
+F = 5 
+P = 0
+S = 1
+W = outputSizeCNN(W, F, P, S)
+W = outputSizePool(W, F=2, S=2)
