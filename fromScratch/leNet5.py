@@ -41,7 +41,7 @@ class ConvNet(nn.Module):
         self.fc3 = nn.Linear(in_features=84, out_features=10)
 
     def forward(self, x):
-        sig = nn.Sigmoid()
+        sig = nn.ReLU()
         x = self.pool(sig(self.conv1(x)))
         x = self.pool(sig(self.conv2(x)))
         # Flatten
@@ -64,10 +64,13 @@ for epoch in range(num_epochs):
         
         outputs = model(images)
         loss = criterion(outputs, labels)
-        allLoss.append(loss)
+        allLoss.append(float(loss.cpu().detach().numpy()))
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+    plt.plot(allLoss)
+    plt.show()
 # %%
 with torch.no_grad():
     correct = 0
