@@ -11,10 +11,11 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 
+# %matplotlib inline
 from tqdm import tqdm
 # %%
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+print(device)
 # Hyper-parameters
 num_epochs = 8
 batch_size = 4
@@ -35,7 +36,7 @@ class ConvNet(nn.Module):
         self.conv1 = nn.Conv2d(in_channels = 1, out_channels=6, kernel_size=5, padding=2)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5)
-        self.fc1 = nn.Linear(in_features=5*16*5, out_features=120)
+        self.fc1 = nn.Linear(in_features=5*16*5, out_features=120) # in - 400
         self.fc2 = nn.Linear(in_features=120, out_features=84)
         self.fc3 = nn.Linear(in_features=84, out_features=10)
 
@@ -67,6 +68,27 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+# %%
+with torch.no_grad():
+    correct = 0
+    total = 0
+    for images, labels in test_loader:
+        images = images.to(device)
+        labels = labels.to(device)
+        outputs = model(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+    print('Accuracy of the network on the 10000 test images: {} %'.format(100 * correct / total))
+
+
+# %%
+plt.imshow(images[0][0].cpu())
+
+# %%
+_, b = torch.max(outputs[0])
+
 # %%
 dataiter = iter(train_loader)
 images, labels = dataiter.next()
