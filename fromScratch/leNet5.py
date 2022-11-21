@@ -54,7 +54,7 @@ class ConvNet(nn.Module):
 model = ConvNet().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-
+allLoss = []
 for epoch in range(num_epochs):
     print(f'epoch: {epoch} ----')
     for i, (images, labels) in enumerate(tqdm(train_loader)):
@@ -64,7 +64,7 @@ for epoch in range(num_epochs):
         
         outputs = model(images)
         loss = criterion(outputs, labels)
-        
+        allLoss.append(loss)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
