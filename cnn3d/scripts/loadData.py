@@ -2,6 +2,7 @@
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
+from tqdm import tqdm 
 
 from torch.utils.data import Dataset, DataLoader
 import torch
@@ -38,7 +39,6 @@ class num3D(Dataset):
     def __getitem__(self, idx):
         ptIdx = torch.from_numpy(np.expand_dims(self.points[idx], axis=0)).float()
         labelIdx = self.labels[idx]
-        print(ptIdx)
         return [ptIdx, labelIdx]
     def __len__(self):
         return len(self.labels)
@@ -52,52 +52,62 @@ img, lbl = next(dataiter)
 # %%
 conv1 = nn.Conv3d(in_channels = 1, out_channels=32, kernel_size=(3,3,3))
 # %%
-conv1(img)
+class convNet3D(nn.Module):
+    def __init__(self):
+        super(convNet3D, self).__init__()
+        self.conv1 = nn.Conv3d(in_channels = 1, out_channels=32, kernel_size=(3,3,3))
+        self.conv2 = nn.Conv3d(in_channels = 32, out_channels=64, kernel_size=(3,3,3))
+        self.pool = nn.MaxPool3d((2,2,2))
+        self.conv3 = nn.Conv3d(in_channels = 64, out_channels=64, kernel_size=(3,3,3))
+        self.conv4 = nn.Conv3d(in_channels = 64, out_channels=16, kernel_size=(3,3,3))
+        self.flatten = torch.nn.Flatten()
+        self.fc = nn.Linear(in_features=16, out_features=10)
 
-# %%
+    def forward(self, x):
+        bn = nn.BatchNorm3d(32, device='cuda')
+        x = F.relu(bn(self.conv1(x)))
 
+        bn = nn.BatchNorm3d(64, device='cuda')
+        x = F.relu(bn(self.conv2(x)))
 
-with h5py.File('../data/full_dataset_vectors.h5', "r") as hf:
-    X_train = hf['X_train'][:]
-    X_test = hf['X_test'][:]
-    y_train = hf['y_train'][:]
-    y_test = hf['y_test'][:]
+        x = F.relu(self.pool(self.conv3(x)))
 
-def prepare_points(tensor):
-    tensor = tensor.reshape((
-            tensor.shape[0], 
-            16, 
-            16, 
-            16
-        ))
-    return tensor
-
-# apply threshold and reshaping given tensors
-X_train = prepare_points(X_train)
-X_test = prepare_points(X_test)
-
-# %%
-class dset(torch.utils.data.Dataset):
-    def __init__(self, points, labels) -> None:
-        super(Dataset, self).__init__()
-        self.points = points
-        self.labels = labels
+        x = F.relu(bn(self.conv3(x)))
         
-    def __getitem__(self, index : int) -> torch.tensor:
-        current_points, current_label = self.points[index], self.labels[index]
-        current_points = torch.from_numpy(np.expand_dims(current_points, axis = 0))
-        # current_label = torch.from_numpy(current_label)
-        return [current_points, current_label]
-    
-    def __len__(self) -> int:
-        return len(self.labels)
-train_dataset = dset(X_train, y_train)
-train_loader2 = DataLoader(train_dataset, batch_size=4)
-dataiter = iter(train_loader2)
-img2, lbl = next(dataiter)
+        bn = nn.BatchNorm3d(16, device='cuda')
+        x = F.relu(bn(self.conv4(x)))
+        x = self.flatten(x)
+        x = self.fc(x)
+        return x
+# %% Model parameters
+num_epochs = 50
+batch_size=64
+# %% Train
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = convNet3D().to(device)
+model.to('cuda')
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 # %%
-# apply one-hot-encoding to given labels
-encoder = OneHotEncoder(sparse = False)
-y_train = encoder.fit_transform(y_train.reshape((y_train.shape[0], 1)))
-y_test = encoder.fit_transform(y_test.reshape((y_test.shape[0], 1)))
+phase = 'train'
+for epoch in range(num_epochs):
+    n_correct = 0
+    n_samples = 0
+    for img, label in tqdm(train_loader):
+        label = label.type(torch.LongTensor)
+        img = img.to(device)
+        label = label.to(device)
+        with torch.set_grad_enabled(phase == 'train'):
+            outputs = model(img)
+            _, preds = torch.max(outputs, 1)
+        
+        n_samples += label.size(0)
+        n_correct += (label == preds).sum().item()
 
+        loss = criterion(outputs, label)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    print(f'Epoch accuracy: {n_correct/n_samples:0.2f}')
+# %%
