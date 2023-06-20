@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 # %%
 transform = transforms.ToTensor()
-mnist_data = datasets.MNIST(root = './data', train=True, download=True, transform=transform)
+mnist_data = datasets.MNIST(root = '../data', train=True, download=True, transform=transform)
 
 data_loader = torch.utils.data.DataLoader(dataset=mnist_data,
                                      batch_size=64,
