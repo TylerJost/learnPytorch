@@ -1,2 +1,7 @@
 MNIST/
 data/
+MNISTImgs/
+
+*.pth
+*.png
+*.txt

@@ -21,7 +21,7 @@ images, labels = next(dataiter)
 print(torch.min(images), torch.max(images))
 # %%
 class Autoencoder(nn.Module):
-    def __init__(self):
+    def __init__(self, latent_dims):
         super().__init__()
         # nimages, 784 (28*28)
         self.encoder = nn.Sequential(
@@ -31,11 +31,11 @@ class Autoencoder(nn.Module):
             nn.ReLU(),
             nn.Linear(in_features=64, out_features=12),
             nn.ReLU(),
-            nn.Linear(in_features=12, out_features=10)
+            nn.Linear(in_features=12, out_features=latent_dims)
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(in_features = 10, out_features=12),
+            nn.Linear(in_features = latent_dims, out_features=12),
             nn.ReLU(),
             nn.Linear(in_features=12, out_features=64),
             nn.ReLU(),
@@ -58,7 +58,7 @@ class Autoencoder(nn.Module):
 # %%
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-model = Autoencoder().to(device)
+model = Autoencoder(20).to(device)
 
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr = 1e-3, weight_decay=1e-5)
@@ -69,6 +69,7 @@ num_epochs = 15
 outputs = []
 allLoss = []
 for epoch in range(num_epochs):
+    print(f'Epoch {epoch+1}/{num_epochs}')
     for (img, label) in tqdm(data_loader):
         img = img.reshape(-1, 28*28)
         img = img.to(device)
@@ -78,6 +79,32 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+allEncodings, allLabels = [], []
+for (img, label) in tqdm(data_loader):
+    img = img.reshape(-1, 28*28)
+    img = img.to(device)
+    encoding = model.encoding(img)
+    allEncodings.append(encoding.to('cpu').detach().numpy())
+    allLabels.append(label.to('cpu').detach().numpy())
+
+allEncodings = np.concatenate(allEncodings)
+allLabels = np.concatenate(allLabels)
+# %%
+from sklearn.manifold import TSNE
+X = allEncodings
+X_embedded = TSNE(n_components=2, learning_rate='auto',
+                  init='random', perplexity=3).fit_transform(X)
+# %%
+plt.scatter(X_embedded[:,0], X_embedded[:,1], c=allLabels, cmap='tab10')
+# %%
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
+
+X_train, X_test, y_train, y_test = train_test_split(X, allLabels, test_size=0.33, random_state=42)
+clf = LogisticRegression(random_state=0, max_iter=9000).fit(X_train, y_train)
+y_pred = clf.predict(X_test)
 # %%
 idx = 2
 image = images[idx]

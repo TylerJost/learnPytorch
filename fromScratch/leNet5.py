@@ -76,6 +76,7 @@ with torch.no_grad():
     correct = 0
     total = 0
     for images, labels in test_loader:
+        images = transforms.Resize(39)(images)
         images = images.to(device)
         labels = labels.to(device)
         outputs = model(images)
