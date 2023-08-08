@@ -46,6 +46,80 @@ nChIn           = 1
 nChOut          = 1
 dropoutRate     = 0.2
 # %%
+Discriminator = nn.Sequential(
+            nn.Linear(nLatentDims, 1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(1024, 512),
+            nn.BatchNorm1d(512),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(512, 1),
+            nn.Sigmoid()
+)
+# %%
+Encoder = nn.Sequential(
+            nn.Conv2d(nChIn, 64, 4, 2, 1),
+            nn.BatchNorm2d(64),
+            nn.PReLU(),
+            nn.Conv2d(64, 128, 4, 2, 1),
+            nn.BatchNorm2d(128),
+            nn.PReLU(),
+            nn.Conv2d(128, 256, 4, 2, 1),
+            nn.BatchNorm2d(256),
+            nn.PReLU(),
+            nn.Conv2d(256, 512, 4, 2, 1),
+            nn.BatchNorm2d(512),
+            nn.PReLU(),
+            nn.Conv2d(512, 1024, 4, 2, 1),
+            nn.BatchNorm2d(1024),
+            nn.PReLU(),
+            nn.Conv2d(1024, 1024, 4, 2, 1),
+            nn.BatchNorm2d(1024),
+            nn.PReLU(),
+            nn.Flatten(),
+            nn.PReLU(),
+            # Originally this had 1024 scaled by a size factor, but I don't know why?
+            nn.Linear(1024 * scale * scale, nLatentDims)
+            # nn.BatchNorm1d(nLatentDims)
+        )
+# %%
+Decoder = nn.Sequential(
+            nn.Linear(nLatentDims, 1024),
+            nn.Unflatten(1, (1024, img_size, img_size)),
+            nn.PReLU(),
+            nn.ConvTranspose2d(1024, 1024, 4, 2, 1),
+            nn.BatchNorm2d(1024),
+            nn.PReLU(),
+            nn.ConvTranspose2d(1024, 512, 4, 2, 1),
+            nn.BatchNorm2d(512),
+            nn.PReLU(),
+            nn.ConvTranspose2d(512, 256, 4, 2, 1),
+            nn.BatchNorm2d(256),
+            nn.PReLU(),
+            nn.ConvTranspose2d(256, 128, 4, 2, 1),
+            nn.BatchNorm2d(128),
+            nn.PReLU(),
+            nn.ConvTranspose2d(128, 64, 4, 2, 1),
+            nn.BatchNorm2d(64),
+            nn.PReLU(),
+            nn.ConvTranspose2d(64, 1, 4, 2, 1),
+            nn.Sigmoid()
+        )
+
+
+# %%
+encoder = Encoder.apply(weights_init)
+decoder = Decoder.apply(weights_init)
+
+cuda = True if torch.cuda.is_available() else False
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+if cuda:
+    encoder.cuda()
+    decoder.cuda()
+# %%
 transform = transforms.ToTensor()
 mnist_data = datasets.MNIST(root = '../data', train=True, download=True, transform=transform)
 
@@ -58,7 +132,7 @@ dataiter = iter(data_loader)
 images, labels = next(dataiter)
 
 images = transforms.Resize(120)(images).cuda()
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 # %%
 class Encoder(nn.Module):
     def __init__(self):
@@ -282,17 +356,49 @@ for epoch in range(n_epochs):
 # %% Look at some reconstructions
 for imgs, labels in tqdm(data_loader):
     imgs = transforms.Resize(120)(images).cuda()
-    imgs = imgs.to(device)    
+    imgs = imgs.to(device)
     encodings = encoder(imgs)
     decodings = decoder(encodings)
     break
-
-img0 = imgs[0][0].detach().cpu().numpy()
-label0 = labels[0].detach().cpu().numpy()
-decoding0 = decodings[0][0].detach().cpu().numpy()
+# %%
+idx = 3
+img0 = imgs[idx][0].detach().cpu().numpy()
+label0 = labels[idx].detach().cpu().numpy()
+decoding0 = decodings[idx][0].detach().cpu().numpy()
 
 plt.subplot(121)
 plt.imshow(img0)
 plt.subplot(122)
 plt.imshow(decoding0)
 # %%
+finalEncodings = []
+allLabels = []
+c = 0
+for imgs, labels in tqdm(data_loader):
+    imgs = transforms.Resize(120)(images).cuda()
+    imgs = imgs.to(device)
+
+    encodings = encoder(real_imgs)
+    finalEncodings.append(encodings.detach().cpu().numpy())
+    allLabels.append(labels.detach().cpu().numpy())
+    c +=1
+
+    if c > 100:
+        break
+allLabels = np.concatenate(allLabels)
+finalEncodings = np.concatenate(finalEncodings)
+# %%
+from sklearn.manifold import TSNE
+X_embedded = TSNE(n_components=2, learning_rate='auto', 
+                  init='random', perplexity=3).fit_transform(finalEncodings)
+# %%
+plt.scatter(X_embedded[:,0], X_embedded[:,1], c=allLabels, cmap='tab10')
+plt.colorbar()
+# %%
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(
+                         finalEncodings, allLabels, test_size=0.33, random_state=42)
+clf = LogisticRegression(random_state=0).fit(X_train, y_train)
+
+clf.score(X_test, y_test)
