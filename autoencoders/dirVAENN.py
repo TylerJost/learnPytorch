@@ -288,7 +288,10 @@ for epoch in range(1, epochs + 1):
     with torch.no_grad():
         sample = torch.randn(64, category).to(device)
         sample = model.decode(sample).cpu()
+
+torch.save(model.state_dict(), './dirVAENN150.pth')
 # %%
+model.load_state_dict(torch.load('./dirVAENN150.pth'))
 c = 0
 encodings, labels = [], []
 for imgs, label in train_loader:
@@ -298,12 +301,12 @@ for imgs, label in train_loader:
     encodings.append(gauss_z.cpu().detach().numpy())
     labels.append(label.cpu().detach().numpy())
     c +=1
-    if c > 25:
+    if c > 50:
         break
 encodings = np.concatenate(encodings)
 labels = np.concatenate(labels)
 # %%
-idx = 1
+idx = 4
 img0 = imgs[idx][0].detach().cpu().numpy()
 label0 = label[idx].detach().cpu().numpy()
 decoding0 = recon_batch[idx][0].detach().cpu().numpy()
@@ -312,23 +315,9 @@ plt.imshow(img0)
 plt.subplot(122)
 plt.imshow(decoding0)
 # %%
-model.eval()
-test_loss = 0
-with torch.no_grad():
-    for i, (data, _) in enumerate(test_loader):
-        data = data.to(device)
-        data = transforms.Resize(150)(data)
-
-        recon_batch, mu, logvar, gauss_z, dir_z = model(data)
-        loss = model.loss_function(recon_batch, data, mu, logvar, category)
-        test_loss += loss.mean()
-        test_loss.item()
-        if i == 0:
-            n = min(data.size(0), 64)
-            comparison = torch.cat([data[:n],
-                                    recon_batch.view(batch_size, 1, 150, 150)[:n]])
-            save_image(comparison.cpu(), 
-                        f'image/recon_{str(epoch)}_{gauss_z.shape[1]}cat.png', nrow=n)
-
-test_loss /= len(test_loader.dataset)
-print('====> Test set loss: {:.4f}'.format(test_loss))
+from sklearn.manifold import TSNE
+X_embedded = TSNE(n_components=2, learning_rate='auto', 
+                  init='random', perplexity=3).fit_transform(encodings)
+# %%
+plt.scatter(X_embedded[:,0], X_embedded[:,1], c=labels, cmap='tab10')
+plt.colorbar()
