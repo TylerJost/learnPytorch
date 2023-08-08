@@ -12,7 +12,7 @@ from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
 # %%
-batch_size = 1
+batch_size = 64
 epochs = 10
 seed = 1234
 log_interval = 1000
@@ -94,7 +94,6 @@ class Dir_VAE2(nn.Module):
                 x = self.batch124(x)
                 x = self.leakyrelu(x)
 
-                print(x.shape)
                 return x
         class Decoder(nn.Module):
             def __init__(self):
@@ -223,7 +222,7 @@ def train(epoch):
         data = data.to(device)
         optimizer.zero_grad()
         recon_batch, mu, logvar, gauss_z, dir_z = model(data)
-        loss = loss_function(recon_batch, data, mu, logvar, category)
+        loss = model.loss_function(recon_batch, data, mu, logvar, category)
         loss = loss.mean()
         loss.backward()
         train_loss += loss.item()
@@ -244,6 +243,8 @@ def test(epoch):
     with torch.no_grad():
         for i, (data, _) in enumerate(test_loader):
             data = data.to(device)
+            data = transforms.Resize(150)(data)
+
             recon_batch, mu, logvar, gauss_z, dir_z = model(data)
             loss = model.loss_function(recon_batch, data, mu, logvar, category)
             test_loss += loss.mean()
@@ -251,7 +252,7 @@ def test(epoch):
             if i == 0:
                 n = min(data.size(0), 18)
                 comparison = torch.cat([data[:n],
-                                      recon_batch.view(batch_size, 1, 28, 28)[:n]])
+                                      recon_batch.view(batch_size, 1, 120, 120)[:n]])
                 save_image(comparison.cpu(), 
                            f'image/recon_{str(epoch)}_{gauss_z.shape[1]}cat.png', nrow=n)
 
@@ -262,7 +263,7 @@ for epoch in range(1, epochs + 1):
     # Train
     model.train()
     train_loss = 0
-    for batch_idx, (data, _) in enumerate(train_loader):
+    for batch_idx, (data, _) in enumerate(tqdm(train_loader)):
         data = transforms.Resize(150)(data)
         data = data.to(device)
         optimizer.zero_grad()
@@ -279,12 +280,55 @@ for epoch in range(1, epochs + 1):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader),
                 loss.item() / len(data)))
-    break
+    
     print('====> Epoch: {} Average loss: {:.4f}'.format(
           epoch, train_loss / len(train_loader.dataset)))
     
-    test(epoch)
+    # test(epoch)
     with torch.no_grad():
         sample = torch.randn(64, category).to(device)
         sample = model.decode(sample).cpu()
 # %%
+c = 0
+encodings, labels = [], []
+for imgs, label in train_loader:
+    imgs = imgs.to(device)
+    imgs = transforms.Resize(150)(imgs)
+    recon_batch, mu, logvar, gauss_z, dir_z = model(imgs)
+    encodings.append(gauss_z.cpu().detach().numpy())
+    labels.append(label.cpu().detach().numpy())
+    c +=1
+    if c > 25:
+        break
+encodings = np.concatenate(encodings)
+labels = np.concatenate(labels)
+# %%
+idx = 1
+img0 = imgs[idx][0].detach().cpu().numpy()
+label0 = label[idx].detach().cpu().numpy()
+decoding0 = recon_batch[idx][0].detach().cpu().numpy()
+plt.subplot(121)
+plt.imshow(img0)
+plt.subplot(122)
+plt.imshow(decoding0)
+# %%
+model.eval()
+test_loss = 0
+with torch.no_grad():
+    for i, (data, _) in enumerate(test_loader):
+        data = data.to(device)
+        data = transforms.Resize(150)(data)
+
+        recon_batch, mu, logvar, gauss_z, dir_z = model(data)
+        loss = model.loss_function(recon_batch, data, mu, logvar, category)
+        test_loss += loss.mean()
+        test_loss.item()
+        if i == 0:
+            n = min(data.size(0), 64)
+            comparison = torch.cat([data[:n],
+                                    recon_batch.view(batch_size, 1, 150, 150)[:n]])
+            save_image(comparison.cpu(), 
+                        f'image/recon_{str(epoch)}_{gauss_z.shape[1]}cat.png', nrow=n)
+
+test_loss /= len(test_loader.dataset)
+print('====> Test set loss: {:.4f}'.format(test_loss))

@@ -32,7 +32,7 @@ def weights_init(m):
             m.bias.data.fill_(0)
 
 # %% Inputs
-n_epochs = 50
+n_epochs = 10
 batch_size = 4
 lr = .0002
 b1 = 0.5
@@ -280,19 +280,33 @@ for epoch in range(n_epochs):
         #     pass
         #     # sample_image(n_row=10, batches_done=batches_done)
 # %% Look at some reconstructions
-for imgs, labels in tqdm(data_loader):
+encodings, labels = [], []
+c = 0
+for imgs, label in tqdm(data_loader):
     imgs = transforms.Resize(120)(images).cuda()
     imgs = imgs.to(device)    
-    encodings = encoder(imgs)
-    decodings = decoder(encodings)
-    break
-
+    encoding = encoder(imgs)
+    decoding = decoder(encoding)
+    encodings.append(encoding.detach().cpu().numpy())
+    labels.append(label.detach().cpu().numpy())
+    c +=1
+    if c > 25:
+        break
+encodings = np.concatenate(encodings)
+labels = np.concatenate(labels)
 img0 = imgs[0][0].detach().cpu().numpy()
-label0 = labels[0].detach().cpu().numpy()
-decoding0 = decodings[0][0].detach().cpu().numpy()
+label0 = label[0].detach().cpu().numpy()
+decoding0 = decoding[0][0].detach().cpu().numpy()
 
 plt.subplot(121)
 plt.imshow(img0)
 plt.subplot(122)
 plt.imshow(decoding0)
+# %%
+from sklearn.manifold import TSNE
+X_embedded = TSNE(n_components=2, learning_rate='auto', 
+                  init='random', perplexity=3).fit_transform(encodings)
+# %%
+plt.scatter(X_embedded[:,0], X_embedded[:,1], c=labels, cmap='tab10')
+plt.colorbar()
 # %%

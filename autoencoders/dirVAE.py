@@ -164,7 +164,6 @@ def train(epoch):
     train_loss = 0
     for batch_idx, (data, _) in enumerate(train_loader):
         # data = transforms.Resize(120)(data)
-        print(data.shape)
         data = data.to(device)
         optimizer.zero_grad()
         recon_batch, mu, logvar, gauss_z, dir_z = model(data)
@@ -218,6 +217,8 @@ for imgs, label in train_loader:
     imgs = imgs.to(device)
     mu, logvar = model.encode(imgs)
     gauss_z = model.reparameterize(mu, logvar)
+    recon_batch, mu, logvar, gauss_z, dir_z = model(imgs)
+
     encodings.append(gauss_z.cpu().detach().numpy())
     labels.append(label.cpu().detach().numpy())
     c +=1
@@ -225,6 +226,15 @@ for imgs, label in train_loader:
         break
 encodings = np.concatenate(encodings)
 labels = np.concatenate(labels)
+# %%
+idx = 1
+img0 = imgs[idx][0].detach().cpu().numpy()
+label0 = label[idx].detach().cpu().numpy()
+decoding0 = recon_batch[idx][0].detach().cpu().numpy()
+plt.subplot(121)
+plt.imshow(img0)
+plt.subplot(122)
+plt.imshow(decoding0)
 # %%
 from sklearn.manifold import TSNE
 X_embedded = TSNE(n_components=2, learning_rate='auto', 
