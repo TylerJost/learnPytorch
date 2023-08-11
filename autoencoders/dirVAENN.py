@@ -16,7 +16,7 @@ batch_size = 64
 epochs = 10
 seed = 1234
 log_interval = 1000
-category = 20
+category = 60
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 train_loader = torch.utils.data.DataLoader(
