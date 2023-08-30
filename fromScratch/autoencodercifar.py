@@ -75,7 +75,7 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
 # %%
-idx = 33
+idx = 35
 images = images[:, 0:1, :, :]
 image = images[idx]
 imgOut = model(image.to(device))

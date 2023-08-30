@@ -366,7 +366,7 @@ model.eval()
 valid_originals = valid_originals.to(device)
 
 vq_output_eval = model._pre_vq_conv(model._encoder(valid_originals))
-_, valid_quantize, _, _ = model._vq_vae(vq_output_eval)
+_, valid_quantize, _, encodings = model._vq_vae(vq_output_eval)
 valid_reconstructions = model._decoder(valid_quantize)
 
 (train_originals, _) = next(iter(training_loader))
@@ -389,3 +389,4 @@ from sklearn.manifold import TSNE
 
 proj = TSNE(n_components=2, learning_rate='auto',
                    init='random', perplexity=3).fit_transform(model._vq_vae._embedding.weight.data.cpu())
+# %%
